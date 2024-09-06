@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/donovansolms/droplets-dashboard/indexer/src/indexer/models"
@@ -28,6 +27,9 @@ type Config struct {
 	RPCEndpoint             string `envconfig:"RPC_ENDPOINT" required:"true"`
 	CelatoneQuery           string `envconfig:"CELATONE_QUERY" required:"true"`
 	DropletsContractAddress string `envconfig:"DROPLETS_CONTRACT_ADDRESS" required:"true"`
+
+	TempHistoryHeight uint64 `envconfig:"TEMP_HISTORY_HEIGHT" required:"false"`
+	TempHistoryDate   string `envconfig:"TEMP_HISTORY_DATE" required:"false"`
 }
 
 // Indexer implements the reference indexer service
@@ -39,7 +41,9 @@ type Indexer struct {
 	stopChannel             chan bool
 	db                      *gorm.DB
 	lastTransationTime      time.Time
-	wg                      sync.WaitGroup
+
+	tempHistoryHeight uint64
+	tempHistoryDate   time.Time
 }
 
 // New returns a new instance of the indexer service and returns an error if
@@ -61,6 +65,13 @@ func New(
 		return nil, err
 	}
 
+	// TEMP
+	// historyDate, err := time.Parse("2006-01-02T15:04:05", config.TempHistoryDate)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	historyDate := time.Now()
+
 	return &Indexer{
 		rpcEndpoint:             config.RPCEndpoint,
 		celatoneQuery:           config.CelatoneQuery,
@@ -69,6 +80,9 @@ func New(
 		stopChannel:             make(chan bool),
 		db:                      db,
 		lastTransationTime:      time.Now(),
+
+		tempHistoryHeight: config.TempHistoryHeight,
+		tempHistoryDate:   historyDate,
 	}, nil
 }
 
@@ -76,23 +90,56 @@ func New(
 func (i *Indexer) Run() error {
 	i.logger.Info("Starting indexer")
 
-	// height, lastOnchainUpdateTime, error := i.getLastOnChainUpdate()
-	// if error != nil {
-	// 	i.logger.Error("Failed to get last point update")
-	// 	return error
-	// }
+	// BACKFILL CODE
 
-	// i.logger.Infof("Last onchain update time: %s", lastOnchainUpdateTime)
+	// fmt.Println("Temp history height:", i.tempHistoryHeight)
+	// fmt.Println("Temp history date:", i.tempHistoryDate)
 
-	// Check if the last onchain update is later than the last time we updated the points
-	// If it is, we need to update the points
-	// TODO: HAck for testing
-	height := uint64(101112)
-	i.lastTransationTime = time.Now().Add(-time.Hour * 24 * 7)
-	lastOnchainUpdateTime := time.Now().Add(-time.Hour * 23 * 7)
+	// // os.Exit(0)
 
-	if lastOnchainUpdateTime.After(i.lastTransationTime) {
-		i.logger.Info("Updating points")
+	// // // TODO: HAck for testing
+	// height := int64(0)
+	// i.lastTransationTime = time.Now().Add(-time.Hour * 24 * 7)
+	// lastOnchainUpdateTime := time.Now().Add(-time.Hour * 23 * 7)
+
+	// height = int64(i.tempHistoryHeight)
+	// lastOnchainUpdateTime = i.tempHistoryDate
+
+	// END OF BACKFILL CODE
+
+	i.logger.Info("Fetching last on-chain update")
+	height, lastOnchainUpdateTime, error := i.getLastOnChainUpdate()
+	if error != nil {
+		i.logger.Error("Failed to get last point update")
+		return error
+	}
+
+	i.logger.WithFields(logrus.Fields{
+		"height": height,
+		"date":   lastOnchainUpdateTime,
+	}).Info("Last on-chain update")
+
+	// Fetch last update we captured
+	i.logger.Info("Fetching last captured update")
+	var lastCapture models.DropletStatsHistory
+	result := i.db.Order("height DESC").First(&lastCapture)
+	if result.Error != nil {
+		if result.Error != gorm.ErrRecordNotFound {
+			i.logger.WithFields(logrus.Fields{
+				"err": result.Error,
+			}).Fatal("Unable to fetch last stats")
+		}
+	}
+
+	i.logger.WithFields(logrus.Fields{
+		"height": lastCapture.Height,
+		"date":   lastCapture.DateBlock,
+	}).Info("Last captured update")
+
+	// Check if the latest on-chain is newer than what we've captured
+	// If so, update Droplets
+	if lastCapture.Height < height {
+		i.logger.Info("Updating Droplets")
 
 		// Set the offset key to empty
 		offsetKey := bytes.HexBytes{}
@@ -100,17 +147,16 @@ func (i *Indexer) Run() error {
 		limit := uint64(100)
 		var addressDroplets []AddressDroplets
 
-		lastKey, fetchedDroplets, err := i.getDroplets(offsetKey, limit)
+		lastKey, fetchedDroplets, err := i.getDroplets(height, offsetKey, limit)
 		if err != nil {
 			i.logger.Error("Failed to get all droplets")
 			return err
 		}
 		addressDroplets = append(addressDroplets, fetchedDroplets...)
 
-		_ = lastKey
 		for len(fetchedDroplets) >= int(limit) {
 			// Move on to the next batch
-			lastKey, fetchedDroplets, err = i.getDroplets(lastKey, limit)
+			lastKey, fetchedDroplets, err = i.getDroplets(height, lastKey, limit)
 			if err != nil {
 				i.logger.Error("Failed to get all droplets")
 				return err
@@ -133,6 +179,7 @@ func (i *Indexer) Run() error {
 		}
 		i.logger.Debug("Leaderboard truncated")
 
+		i.logger.Info("Processing Droplets")
 		// Capture all the droplets for datetime/lastOnchainUpdateTime
 		for _, account := range addressDroplets {
 
@@ -180,6 +227,29 @@ func (i *Indexer) Run() error {
 			}
 		}
 
+		// Rank the leaderboard
+		rankingQuery := `
+		WITH ranked_droplets AS (
+		SELECT
+			id,
+			ROW_NUMBER() OVER (ORDER BY droplets DESC) AS rank  -- Calculate rank based on descending order of 'droplets'
+		FROM
+			droplet_leaderboard
+		)
+		UPDATE droplet_leaderboard
+		SET position = ranked_droplets.rank  -- Update the 'position' column with the calculated rank
+		FROM ranked_droplets
+		WHERE droplet_leaderboard.id = ranked_droplets.id;  -- Match each row by 'id' 
+	`
+		result = i.db.Exec(rankingQuery)
+		if result.Error != nil {
+			i.logger.WithFields(logrus.Fields{
+				"err": result.Error,
+			}).Fatal("Unable to rank leaderboard")
+		}
+
+		i.logger.Info("Leaderboard rankes inserted")
+
 		// Count unique addresses in the dashboard
 		var totalUniqueAddresses int64
 		result = i.db.Model(&models.DropletLeaderboard{}).Select("DISTINCT(address)").Count(&totalUniqueAddresses)
@@ -225,9 +295,16 @@ func (i *Indexer) Run() error {
 			}
 		}
 
+		i.logger.Info("All Droplets processed")
 	}
 
-	// TODO: Wait 1 hour and check if we should capture again
+	// Now wait 30 minutes to see if we should update again
+	// We could wait much longer, but if we capture in the middle of an update
+	// by the Drop team, we might have a long delay, instead we can check more
+	// often since it is a single API call that determines if we should capture
+	// i.logger.Info("Waiting 30 minutes before next update")
+	// time.Sleep(time.Minute * 30)
+	i.logger.Info("Wait for next run")
 
 	return nil
 }
@@ -242,7 +319,7 @@ func (i *Indexer) Stop() error {
 
 // getLastOnChainUpdate gets the last time the points were updated on chain
 // We do this by querying the Celatone API for the last transaction that updated points
-func (i *Indexer) getLastOnChainUpdate() (uint64, time.Time, error) {
+func (i *Indexer) getLastOnChainUpdate() (int64, time.Time, error) {
 	response, err := http.Get(i.celatoneQuery)
 	if err != nil {
 		i.logger.Error("Failed to get last point update")
@@ -268,7 +345,7 @@ func (i *Indexer) getLastOnChainUpdate() (uint64, time.Time, error) {
 
 // getAllDroplets captures all the addresses and their Droplets by fetching the
 // raw contract state and parsing all the information
-func (i *Indexer) getDroplets(offsetKey bytes.HexBytes, limit uint64) (bytes.HexBytes, []AddressDroplets, error) {
+func (i *Indexer) getDroplets(height int64, offsetKey bytes.HexBytes, limit uint64) (bytes.HexBytes, []AddressDroplets, error) {
 	start := time.Now()
 	lastScannedKey := offsetKey
 	addressDroplets := []AddressDroplets{}
@@ -299,7 +376,7 @@ func (i *Indexer) getDroplets(offsetKey bytes.HexBytes, limit uint64) (bytes.Hex
 		context.Background(),
 		"/cosmwasm.wasm.v1.Query/AllContractState",
 		rpcRequest,
-		rpcclient.ABCIQueryOptions{Height: 0, Prove: false},
+		rpcclient.ABCIQueryOptions{Height: height, Prove: false},
 	)
 	if err != nil {
 		return lastScannedKey, addressDroplets, err

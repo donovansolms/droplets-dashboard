@@ -28,6 +28,8 @@ run: build ## Build and run the service binary
 	DATABASE_DSN="host=localhost user=admin password=admin1 dbname=roidrunner port=5432 sslmode=disable TimeZone=UTC" \
 	RPC_ENDPOINT="https://rpc-lb.neutron.org:443/" \
 	DROPLETS_CONTRACT_ADDRESS="neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7" \
+	TEMP_HISTORY_HEIGHT=13278959 \
+	TEMP_HISTORY_DATE="2024-08-09T21:00:10" \
 	./bin/${APP_NAME}
 
 run_race: ## Run the service with race condition checking enabled
