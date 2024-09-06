@@ -5,7 +5,7 @@ type CelatoneTxResponse struct {
 	Items []struct {
 		Created       string `json:"created,omitempty"`
 		Hash          string `json:"hash,omitempty"`
-		Height        int    `json:"height,omitempty"`
+		Height        uint64 `json:"height,omitempty"`
 		IsClearAdmin  bool   `json:"is_clear_admin,omitempty"`
 		IsExecute     bool   `json:"is_execute,omitempty"`
 		IsIbc         bool   `json:"is_ibc,omitempty"`

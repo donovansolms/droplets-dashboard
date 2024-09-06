@@ -25,7 +25,7 @@ run: build ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME=${SERVICE_NAME} \
 	CELATONE_QUERY="https://celatone-api-prod.alleslabs.dev/v1/neutron/neutron-1/accounts/neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7/txs?limit=1&offset=0&is_wasm=true&is_move=false&is_initia=false&is_send=false&is_ibc=false&is_instantiate=false&is_store_code=false&is_execute=false&is_migrate=false&is_update_admin=false&is_clear_admin=false&is_move_publish=false&is_move_upgrade=false&is_move_execute=false&is_move_script=false&is_opinit=false" \
-	DATABASE_DSN="" \
+	DATABASE_DSN="host=localhost user=admin password=admin1 dbname=roidrunner port=5432 sslmode=disable TimeZone=UTC" \
 	RPC_ENDPOINT="https://rpc-lb.neutron.org:443/" \
 	DROPLETS_CONTRACT_ADDRESS="neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7" \
 	./bin/${APP_NAME}

@@ -11,13 +11,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/donovansolms/droplets-dashboard/indexer/src/indexer/models"
 	"github.com/gogo/protobuf/proto"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/sirupsen/logrus"
 	"github.com/tendermint/tendermint/libs/bytes"
 	rpcclient "github.com/tendermint/tendermint/rpc/client"
 	rpchttp "github.com/tendermint/tendermint/rpc/client/http"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type Config struct {
@@ -51,14 +54,12 @@ func New(
 		log.Fatalf("Unable to process config: %s", err)
 	}
 
-	db := &gorm.DB{}
-
-	// db, err := gorm.Open(postgres.Open(config.DatabaseDSN), &gorm.Config{
-	// 	Logger: logger.Default.LogMode(logger.Silent),
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
+	db, err := gorm.Open(postgres.Open(config.DatabaseDSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &Indexer{
 		rpcEndpoint:             config.RPCEndpoint,
@@ -75,7 +76,7 @@ func New(
 func (i *Indexer) Run() error {
 	i.logger.Info("Starting indexer")
 
-	// lastOnchainUpdateTime, error := i.getLastOnChainUpdate()
+	// height, lastOnchainUpdateTime, error := i.getLastOnChainUpdate()
 	// if error != nil {
 	// 	i.logger.Error("Failed to get last point update")
 	// 	return error
@@ -86,6 +87,7 @@ func (i *Indexer) Run() error {
 	// Check if the last onchain update is later than the last time we updated the points
 	// If it is, we need to update the points
 	// TODO: HAck for testing
+	height := uint64(101112)
 	i.lastTransationTime = time.Now().Add(-time.Hour * 24 * 7)
 	lastOnchainUpdateTime := time.Now().Add(-time.Hour * 23 * 7)
 
@@ -106,38 +108,108 @@ func (i *Indexer) Run() error {
 		addressDroplets = append(addressDroplets, fetchedDroplets...)
 
 		_ = lastKey
-		// for len(fetchedDroplets) >= int(limit) {
-		// 	// Move on to the next batch
-		// 	lastKey, fetchedDroplets, err = i.getDroplets(lastKey, limit)
-		// 	if err != nil {
-		// 		i.logger.Error("Failed to get all droplets")
-		// 		return err
-		// 	}
-		// 	addressDroplets = append(addressDroplets, fetchedDroplets...)
-		// 	i.logger.WithFields(logrus.Fields{
-		// 		"total": len(addressDroplets),
-		// 	}).Debug("Droplets fetched")
+		for len(fetchedDroplets) >= int(limit) {
+			// Move on to the next batch
+			lastKey, fetchedDroplets, err = i.getDroplets(lastKey, limit)
+			if err != nil {
+				i.logger.Error("Failed to get all droplets")
+				return err
+			}
+			addressDroplets = append(addressDroplets, fetchedDroplets...)
+			i.logger.WithFields(logrus.Fields{
+				"total": len(addressDroplets),
+			}).Debug("Droplets fetched")
 
-		// 	// Slow down to not query too hard
-		// 	time.Sleep(time.Millisecond * 500)
-		// }
+			// Slow down to not query too hard
+			time.Sleep(time.Millisecond * 500)
+		}
 
-		fmt.Println("Got all droplets: ", len(addressDroplets))
+		totalDroplets := uint64(0)
+
+		// Truncate the leaderboard
+		result := i.db.Exec("TRUNCATE TABLE droplet_leaderboard")
+		if result.Error != nil {
+			i.logger.WithFields(logrus.Fields{
+				"err": result.Error,
+			}).Fatal("Unable to truncate leaderboard")
+		}
+		i.logger.Debug("Leaderboard truncated")
 
 		// Capture all the droplets for datetime/lastOnchainUpdateTime
-		for _, droplet := range addressDroplets {
-			fmt.Println(droplet.Address, droplet.Droplets)
+		for _, account := range addressDroplets {
+			totalDroplets += account.Droplets
+
+			// Store the history item
+			historyModel := models.DropletAddressHistory{
+				Address:     account.Address,
+				Droplets:    account.Droplets,
+				Height:      height,
+				DateBlock:   lastOnchainUpdateTime,
+				DateCreated: time.Now(),
+			}
+			result := i.db.Save(&historyModel)
+			if result.Error != nil {
+				// If the error is a duplicate key error, we ignore it
+				if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
+					i.logger.WithFields(logrus.Fields{
+						"address":  account.Address,
+						"droplets": account.Droplets,
+						"err":      result.Error,
+					}).Fatal("Unable to store history")
+				}
+			}
+
+			// Add to the leaderboard
+			leaderboardModel := models.DropletLeaderboard{
+				Address:  account.Address,
+				Droplets: account.Droplets,
+				Height:   height,
+
+				DateBlock:   lastOnchainUpdateTime,
+				DateCreated: time.Now(),
+			}
+			result = i.db.Save(&leaderboardModel)
+			if result.Error != nil {
+				// If the error is a duplicate key error, we ignore it
+				if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
+					i.logger.WithFields(logrus.Fields{
+						"address":  account.Address,
+						"droplets": account.Droplets,
+						"err":      result.Error,
+					}).Fatal("Unable to store leaderboard item")
+				}
+			}
+		}
+
+		i.logger.WithFields(logrus.Fields{
+			"total": totalDroplets,
+			"count": len(addressDroplets),
+		}).Info("Droplet history updated")
+
+		// Log the stats history
+		statsModel := models.DropletStatsHistory{
+			TotalDroplets:  totalDroplets,
+			TotalAddresses: uint64(len(addressDroplets)),
+			Height:         height,
+
+			DateBlock:   lastOnchainUpdateTime,
+			DateCreated: time.Now(),
+		}
+		result = i.db.Save(&statsModel)
+		if result.Error != nil {
+			// If the error is a duplicate key error, we ignore it
+			if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
+				i.logger.WithFields(logrus.Fields{
+					"total_address":  len(addressDroplets),
+					"total_droplets": totalDroplets,
+					"err":            result.Error,
+				}).Fatal("Unable to store stats item")
+			}
 		}
 
 	}
 
-	// i.wg.Add(1)
-	// go i.indexBlocks()
-
-	// i.wg.Add(1)
-	// go i.updateBaseToken()
-
-	// i.wg.Wait()
+	// TODO: Wait 1 hour and check if we should capture again
 
 	return nil
 }
@@ -152,27 +224,28 @@ func (i *Indexer) Stop() error {
 
 // getLastOnChainUpdate gets the last time the points were updated on chain
 // We do this by querying the Celatone API for the last transaction that updated points
-func (i *Indexer) getLastOnChainUpdate() (time.Time, error) {
+func (i *Indexer) getLastOnChainUpdate() (uint64, time.Time, error) {
 	response, err := http.Get(i.celatoneQuery)
 	if err != nil {
 		i.logger.Error("Failed to get last point update")
-		return time.Time{}, err
+		return 0, time.Time{}, err
 	}
 
 	var txResponse CelatoneTxResponse
 	err = json.NewDecoder(response.Body).Decode(&txResponse)
 	if err != nil {
 		i.logger.Error("Failed to parse last point update")
-		return time.Time{}, err
+		return 0, time.Time{}, err
 	}
 
 	// Loop through the items in the response and find the last time a tx was executed
 	// We could do better here, but this should be enough for now
 	for _, item := range txResponse.Items {
-		return time.Parse("2006-01-02T15:04:05", item.Created)
+		txTime, err := time.Parse("2006-01-02T15:04:05", item.Created)
+		return item.Height, txTime, err
 	}
 
-	return time.Time{}, errors.New("no point update found")
+	return 0, time.Time{}, errors.New("no point update found")
 }
 
 // getAllDroplets captures all the addresses and their Droplets by fetching the
