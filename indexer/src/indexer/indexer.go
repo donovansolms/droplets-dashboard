@@ -124,8 +124,6 @@ func (i *Indexer) Run() error {
 			time.Sleep(time.Millisecond * 500)
 		}
 
-		totalDroplets := uint64(0)
-
 		// Truncate the leaderboard
 		result := i.db.Exec("TRUNCATE TABLE droplet_leaderboard")
 		if result.Error != nil {
@@ -137,7 +135,6 @@ func (i *Indexer) Run() error {
 
 		// Capture all the droplets for datetime/lastOnchainUpdateTime
 		for _, account := range addressDroplets {
-			totalDroplets += account.Droplets
 
 			// Store the history item
 			historyModel := models.DropletAddressHistory{
@@ -177,8 +174,29 @@ func (i *Indexer) Run() error {
 						"droplets": account.Droplets,
 						"err":      result.Error,
 					}).Fatal("Unable to store leaderboard item")
+				} else {
+					continue
 				}
 			}
+		}
+
+		// Count unique addresses in the dashboard
+		var totalUniqueAddresses int64
+		result = i.db.Model(&models.DropletLeaderboard{}).Select("DISTINCT(address)").Count(&totalUniqueAddresses)
+		if result.Error != nil {
+			i.logger.WithFields(logrus.Fields{
+				"err": result.Error,
+			}).Fatal("Unable to count unique addresses")
+		}
+
+		// Count total droplets in the dashboard
+		var totalDroplets int64
+		// Sum the droplets
+		result = i.db.Model(&models.DropletLeaderboard{}).Select("SUM(droplets)").Scan(&totalDroplets)
+		if result.Error != nil {
+			i.logger.WithFields(logrus.Fields{
+				"err": result.Error,
+			}).Fatal("Unable to count total droplets")
 		}
 
 		i.logger.WithFields(logrus.Fields{
@@ -189,7 +207,7 @@ func (i *Indexer) Run() error {
 		// Log the stats history
 		statsModel := models.DropletStatsHistory{
 			TotalDroplets:  totalDroplets,
-			TotalAddresses: uint64(len(addressDroplets)),
+			TotalAddresses: totalUniqueAddresses,
 			Height:         height,
 
 			DateBlock:   lastOnchainUpdateTime,
@@ -200,7 +218,7 @@ func (i *Indexer) Run() error {
 			// If the error is a duplicate key error, we ignore it
 			if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
 				i.logger.WithFields(logrus.Fields{
-					"total_address":  len(addressDroplets),
+					"total_address":  totalUniqueAddresses,
 					"total_droplets": totalDroplets,
 					"err":            result.Error,
 				}).Fatal("Unable to store stats item")
