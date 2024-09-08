@@ -2,7 +2,9 @@
 import LeaderboardTable from '@/components/leaderboard-table';
 import { useQuery, gql } from '@apollo/client';
 // import { useRouter } from 'next/router';
-import DropletStatsChart from '@/components/droplet-stats-chart'; // Import the new chart component
+import DropletsChart from '@/components/droplets-chart';
+import AddressesChart from '@/components/addresses-chart';
+import { formatNumberCompact } from '@/lib/format-number-compact';
 
 const GET_STATS = gql`
   query StatsHistory {
@@ -23,20 +25,14 @@ const Dashboard = () => {
   if (error) return <p>Error: {error.message}</p>;
 
   return (
-    <div>
-      <div className="min-w-0 flex-1">
-        <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
-          Droplets Dashboard
-        </h2>
-      </div>
-
-      {/* Add Droplet Stats Chart here */}
-      <div className="bg-white py-24 sm:py-32">
-        <DropletStatsChart />
-      </div>
-
-      <div className="bg-white py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto p-4 mt-8 mb-8">
+      <h1 className="text-3xl font-semibold mb-4">The Unofficial Droplets Dashboard</h1>
+      <p className="text-gray-400">
+        The information on this dashboard is collected from the public Droplets contract on Neutron and automatically updated shortly
+        after the daily distribution. Feedback and requests can be sent to <a href="https://twitter.com/donovansolms" target='blank' className="drop-green">@donovansolms</a>
+      </p>
+      <div className="backdrop-blur-3xl bg-white/10 rounded-lg max-w-7xl mx-auto p-4 mt-8 mb-8">
+        <div className="container mx-auto p-4">
           {data.droplet_stats_history.map(
             (droplet_stats_history: {
               total_addresses: number;
@@ -44,56 +40,39 @@ const Dashboard = () => {
               date_block: string;
               height: number;
             }) => (
-              <dl className="grid grid-cols-1 gap-x-8 gap-y-16 text-center lg:grid-cols-2">
-                <div className="mx-auto flex max-w-xs flex-col gap-y-4">
-                  <dt className="text-base leading-7 text-gray-600">Droplets</dt>
-                  <dd className="order-first text-3xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                    {formatNumberCompact(droplet_stats_history.total_droplets / 10 ** 6)}
-                  </dd>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-6 w-full text-center">
+                  <h2 className="text-xl font-semibold mb-4">Droplets</h2>
+                  <div className="mx-auto flex max-w-xs flex-col gap-y-4">
+                    <dd className="order-first text-3xl font-semibold tracking-tight text-white sm:text-5xl mb-8">
+                      {formatNumberCompact(droplet_stats_history.total_droplets / 10 ** 6)}
+                    </dd>
+                  </div>
+                  <DropletsChart />
                 </div>
-                <div className="mx-auto flex max-w-xs flex-col gap-y-4">
-                  <dt className="text-base leading-7 text-gray-600">Addresses</dt>
-                  <dd className="order-first text-3xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                    {droplet_stats_history.total_addresses}
-                  </dd>
+
+                <div className="p-6 w-full text-center">
+                  <h2 className="text-xl font-semibold mb-4">Addresses</h2>
+                  <div className="mx-auto flex max-w-xs flex-col gap-y-4">
+                    <dd className="order-first text-3xl font-semibold tracking-tight text-white sm:text-5xl mb-8">
+                      {droplet_stats_history.total_addresses}
+                    </dd>
+                  </div>
+                  <AddressesChart />
                 </div>
-              </dl>
+              </div>
+
             )
           )}
         </div>
-      </div>
-      <div>
-        <h1>Droplet Leaderboard</h1>
         <LeaderboardTable />
       </div>
     </div>
   );
 };
 
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
 
-  // Correctly specify the DateTimeFormatOptions types
-  const options: Intl.DateTimeFormatOptions = {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  };
 
-  return date.toLocaleDateString('en-GB', options);
-}
 
-function formatNumberCompact(number: number): string {
-  if (number >= 1_000_000_000) {
-    return (number / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
-  }
-  if (number >= 1_000_000) {
-    return (number / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  }
-  if (number >= 1_000) {
-    return (number / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-  }
-  return number.toString();
-}
 
 export default Dashboard;

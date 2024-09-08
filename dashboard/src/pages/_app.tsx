@@ -9,8 +9,8 @@ export default function App({ Component, pageProps }: AppProps) {
 
     <ApolloProvider client={client}>
       <Head>
-        <title>Droplets Dashboard</title>
-        <meta property="og:title" content="Droplets Dashboard" />
+        <title>The Unofficial Droplets Dashboard</title>
+        <meta property="og:title" content="The Unofficial Droplets Dashboard" />
       </Head>
       <Component {...pageProps} />
     </ApolloProvider>
