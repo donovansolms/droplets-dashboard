@@ -5,7 +5,7 @@ import DropletHistoryChart from '../../components/droplet-history-chart';
 import { formatNumberCompact } from '@/lib/format-number-compact';
 import { shortenAddress } from '@/lib/shorten-address';
 import { GET_ADDRESS_DETAILS, GET_ADDRESS_HISTORY } from '@/graphql/queries';
-import { formatDateLong } from '@/lib/format-date';
+import { formatDate, formatDateLong } from '@/lib/format-date';
 import Link from 'next/link';
 import DashboardHeader from '@/components/dashboard-header';
 
@@ -103,7 +103,7 @@ const AddressDetailsPage = () => {
             <DropletHistoryChart address={address as string} />
           </div>
 
-          <div className="p-4 w-full mt-8">
+          <div className="w-full mt-8">
             <h2 className="text-xl font-semibold mb-4 text-white">Daily Change</h2>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-700">
@@ -117,7 +117,9 @@ const AddressDetailsPage = () => {
                 <tbody className="divide-y divide-gray-700">
                   {historyWithChanges.map((entry) => (
                     <tr key={entry.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{formatDateLong(entry.date_block)}</td>
+
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white hidden md:block">{formatDateLong(entry.date_block)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white block md:hidden">{formatDate(entry.date_block)}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{formatNumberCompact(entry.droplets / 10 ** 6)}</td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${entry.dailyChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                         +{formatNumberCompact(entry.dailyChange / 10 ** 6)}

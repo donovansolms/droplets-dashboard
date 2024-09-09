@@ -58,7 +58,12 @@ const Dashboard = () => {
             height: number;
           }) => (
             <div className="text-center text-white opacity-30">
-              Droplets last updated on {formatDateWithTime(droplet_stats_history.date_block)}
+              <p>
+                Droplets last updated on {formatDateWithTime(droplet_stats_history.date_block)}
+              </p>
+              <p>
+                Addresses not eligible for the airdrop have been removed from this dashboard
+              </p>
             </div>
           )
         )}

@@ -81,33 +81,37 @@ const LeaderboardTable = () => {
         );
 
     return (
-        <div className="p-6 w-full mt-8">
-            <div className='pb-4 mb-4'>
-                <div className="float-right">
+        <div className="pt-6 pb-6 w-full mt-8">
+            <div className="pb-4 mb-4">
+                <h2 className="text-xl font-semibold mb-4 text-white block sm:hidden">Leaderboard</h2>
+                <div className="flex flex-col items-center sm:float-right sm:flex-row sm:items-center sm:justify-end sm:gap-0 gap-2">
                     <input
                         type="text"
                         placeholder="Search address..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="p-2 border rounded-l-md text-gray-500 focus:outline-none"
+                        className="p-2 border rounded-md text-gray-500 focus:outline-none sm:rounded-l-md flex-grow"
                     />
                     <button
                         onClick={handleSearch}
-                        className="px-4 py-2 drop-purple text-white rounded-r-md hover:drop-purple"
+                        className="px-4 py-2 drop-purple text-white rounded-md sm:rounded-none sm:rounded-r-md hover:drop-purple"
                     >
                         Search
                     </button>
                     {searchTerm && (
                         <button
                             onClick={handleClearSearch}
-                            className="px-4 py-2 ml-2 drop-red text-gray-400 hover:text-white rounded-md"
+                            className="px-4 py-2 rounded-md sm:ml-2 text-gray-400 hover:text-white"
                         >
                             Clear
                         </button>
                     )}
                 </div>
-                <h2 className="text-xl font-semibold mb-4 text-white">Leaderboard</h2>
+                <h2 className="text-xl font-semibold mb-4 text-white hidden sm:block">Leaderboard</h2>
             </div>
+
+
+
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-700">
                     <thead className="">
@@ -141,13 +145,12 @@ const LeaderboardTable = () => {
                 </table>
             </div>
 
-            {/* Pagination Controls */}
             {!isSearching && (
                 <div className="flex justify-between mt-4">
                     <button
                         onClick={handlePreviousPage}
                         disabled={offset === 0}
-                        className="px-4 py-2 drop-purple text-white rounded-md hover:drop-purple  disabled:opacity-50"
+                        className="px-4 py-2 drop-purple text-white rounded-md hover:drop-purple disabled:opacity-50"
                     >
                         Previous
                     </button>
