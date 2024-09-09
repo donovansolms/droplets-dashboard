@@ -31,3 +31,46 @@ export const GET_STATS_HISTORY = gql`
     }
   }
 `;
+
+
+export const GET_STATS = gql`
+  query StatsHistory {
+    droplet_stats_history(limit: 1, order_by: { height: desc }) {
+      total_addresses
+      total_droplets
+      date_block
+      height
+    }
+  }
+`;
+
+export const GET_ADDRESS_DETAILS = gql`
+  query GetAddressDetails($address: String!) {
+    droplet_leaderboard(where: { address: { _eq: $address } }) {
+      address
+      droplets
+      position
+    }
+  }
+`;
+
+export const GET_ADDRESS_POSITION = gql`
+  query GetAddressDetails($address: String!) {
+    droplet_leaderboard(where: { address: { _eq: $address } }) {
+      address
+      droplets
+      position
+    }
+  }
+`;
+
+
+export const GET_ADDRESSES_IN_RANGE = gql`
+  query GetAddressesInRange($start: Int!, $end: Int!) {
+    droplet_leaderboard(where: { position: { _gte: $start, _lte: $end } }, order_by: { position: asc }) {
+      address
+      position
+      droplets
+    }
+  }
+`;

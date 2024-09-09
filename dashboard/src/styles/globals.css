@@ -4,12 +4,12 @@
 
 :root {
   --foreground: #ffffff;
-  --background: url('/image.png') no-repeat center center fixed;
+  --background: url('/background.png') no-repeat center center fixed;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: url('/image.png') no-repeat center center fixed;
+    --background: url('/background.png') no-repeat center center fixed;
   }
 }
 
@@ -41,4 +41,24 @@ body::before {
 
 .drop-green {
   color: #68af94;
+}
+
+.drop-purple {
+  background-color: #492a5b;
+}
+
+.hover\:drop-purple:hover {
+  background-color: #563a7f;
+}
+
+.hover\:drop-green:hover {
+  background-color: #384a3d;
+}
+
+.hover\:drop-green-text:hover {
+  color: rgb(191, 204, 194);
+}
+
+.divide-drop-purple>* {
+  border-color: #393b39;
 }

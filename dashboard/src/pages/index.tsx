@@ -1,38 +1,23 @@
-// pages/index.tsx
 import LeaderboardTable from '@/components/leaderboard-table';
 import { useQuery, gql } from '@apollo/client';
-// import { useRouter } from 'next/router';
 import DropletsChart from '@/components/droplets-chart';
 import AddressesChart from '@/components/addresses-chart';
 import { formatNumberCompact } from '@/lib/format-number-compact';
-
-const GET_STATS = gql`
-  query StatsHistory {
-    droplet_stats_history(limit: 1, order_by: { height: desc }) {
-      total_addresses
-      total_droplets
-      date_block
-      height
-    }
-  }
-`;
+import { formatDateWithTime } from '@/lib/format-date';
+import { GET_STATS } from '@/graphql/queries';
+import DashboardHeader from '@/components/dashboard-header';
 
 const Dashboard = () => {
   const { loading, error, data } = useQuery(GET_STATS);
-  // const router = useRouter();
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <div className="text-center mt-5">Loading...</div>;
   if (error) return <p>Error: {error.message}</p>;
 
   return (
     <div className="max-w-7xl mx-auto p-4 mt-8 mb-8">
-      <h1 className="text-3xl font-semibold mb-4">The Unofficial Droplets Dashboard</h1>
-      <p className="text-gray-400">
-        The information on this dashboard is collected from the public Droplets contract on Neutron and automatically updated shortly
-        after the daily distribution. Feedback and requests can be sent to <a href="https://twitter.com/donovansolms" target='blank' className="drop-green">@donovansolms</a>
-      </p>
+      <DashboardHeader />
       <div className="backdrop-blur-3xl bg-white/10 rounded-lg max-w-7xl mx-auto p-4 mt-8 mb-8">
-        <div className="container mx-auto p-4">
+        <div className="container mx-auto pt-4 pr-2">
           {data.droplet_stats_history.map(
             (droplet_stats_history: {
               total_addresses: number;
@@ -41,7 +26,7 @@ const Dashboard = () => {
               height: number;
             }) => (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-6 w-full text-center">
+                <div className="p-0 w-full text-center">
                   <h2 className="text-xl font-semibold mb-4">Droplets</h2>
                   <div className="mx-auto flex max-w-xs flex-col gap-y-4">
                     <dd className="order-first text-3xl font-semibold tracking-tight text-white sm:text-5xl mb-8">
@@ -51,7 +36,7 @@ const Dashboard = () => {
                   <DropletsChart />
                 </div>
 
-                <div className="p-6 w-full text-center">
+                <div className="w-full text-center">
                   <h2 className="text-xl font-semibold mb-4">Addresses</h2>
                   <div className="mx-auto flex max-w-xs flex-col gap-y-4">
                     <dd className="order-first text-3xl font-semibold tracking-tight text-white sm:text-5xl mb-8">
@@ -61,18 +46,25 @@ const Dashboard = () => {
                   <AddressesChart />
                 </div>
               </div>
-
             )
           )}
         </div>
         <LeaderboardTable />
+        {data.droplet_stats_history.map(
+          (droplet_stats_history: {
+            total_addresses: number;
+            total_droplets: number;
+            date_block: string;
+            height: number;
+          }) => (
+            <div className="text-center text-white opacity-30">
+              Droplets last updated on {formatDateWithTime(droplet_stats_history.date_block)}
+            </div>
+          )
+        )}
       </div>
     </div>
   );
 };
-
-
-
-
 
 export default Dashboard;
