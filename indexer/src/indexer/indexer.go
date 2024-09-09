@@ -23,10 +23,11 @@ import (
 )
 
 type Config struct {
-	DatabaseDSN             string `envconfig:"DATABASE_DSN" required:"true"`
-	RPCEndpoint             string `envconfig:"RPC_ENDPOINT" required:"true"`
-	CelatoneQuery           string `envconfig:"CELATONE_QUERY" required:"true"`
-	DropletsContractAddress string `envconfig:"DROPLETS_CONTRACT_ADDRESS" required:"true"`
+	DatabaseDSN             string   `envconfig:"DATABASE_DSN" required:"true"`
+	RPCEndpoint             string   `envconfig:"RPC_ENDPOINT" required:"true"`
+	CelatoneQuery           string   `envconfig:"CELATONE_QUERY" required:"true"`
+	DropletsContractAddress string   `envconfig:"DROPLETS_CONTRACT_ADDRESS" required:"true"`
+	Skiplist                []string `envconfig:"SKIPLIST" required:"false"`
 
 	TempHistoryHeight uint64 `envconfig:"TEMP_HISTORY_HEIGHT" required:"false"`
 	TempHistoryDate   string `envconfig:"TEMP_HISTORY_DATE" required:"false"`
@@ -41,6 +42,7 @@ type Indexer struct {
 	stopChannel             chan bool
 	db                      *gorm.DB
 	lastTransationTime      time.Time
+	skipList                []string
 
 	tempHistoryHeight uint64
 	tempHistoryDate   time.Time
@@ -80,6 +82,7 @@ func New(
 		stopChannel:             make(chan bool),
 		db:                      db,
 		lastTransationTime:      time.Now(),
+		skipList:                config.Skiplist,
 
 		tempHistoryHeight: config.TempHistoryHeight,
 		tempHistoryDate:   historyDate,
@@ -180,8 +183,27 @@ func (i *Indexer) Run() error {
 		i.logger.Debug("Leaderboard truncated")
 
 		i.logger.Info("Processing Droplets")
+
 		// Capture all the droplets for datetime/lastOnchainUpdateTime
 		for _, account := range addressDroplets {
+
+			// Check if account.Address is in the skiplist, if so, continue to
+			// the next account
+			if len(i.skipList) > 0 {
+				skip := false
+				for _, skipAddress := range i.skipList {
+					if strings.Contains(account.Address, skipAddress) {
+						i.logger.WithFields(logrus.Fields{
+							"address": account.Address,
+						}).Debug("Skipping address")
+						skip = true
+						break
+					}
+				}
+				if skip {
+					continue
+				}
+			}
 
 			// Store the history item
 			historyModel := models.DropletAddressHistory{
