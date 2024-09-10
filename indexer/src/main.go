@@ -19,31 +19,6 @@ type Config struct {
 }
 
 func main() {
-	// fmt.Println("Print dates and heights")
-
-	// // Decode JSON in alltxs.json into TempTxChecks
-	// var tempTxChecks indexer.TempTxChecks
-	// file, err := os.Open("alltxs.json")
-	// if err != nil {
-	// 	log.Fatalf("Unable to open file: %s", err)
-	// }
-	// defer file.Close()
-
-	// decoder := json.NewDecoder(file)
-	// err = decoder.Decode(&tempTxChecks)
-	// if err != nil {
-	// 	log.Fatalf("Unable to decode JSON: %s", err)
-	// }
-
-	// // Print dates and heights
-	// for _, item := range tempTxChecks.Items {
-
-	// 	fmt.Printf("Date: %s, Height: %d\n", item.Created, item.Height)
-	// 	// fmt.Printf("Date: %s, Height: %d\n", tempTxCheck.Date, tempTxCheck.Height)
-	// }
-
-	// os.Exit(0)
-
 	// Parse config environment variables
 	var config Config
 	err := envconfig.Process("", &config)
