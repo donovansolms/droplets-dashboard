@@ -6,7 +6,6 @@
 
 GIT_COMMIT := $(shell git rev-list -1 HEAD)
 BRANCH_NAME := $(shell git rev-parse --abbrev-ref HEAD)
-IMAGE_NAME := "droplets-indexer:latest"
 # This makes the APP_NAME be the name of the current directory
 # Ex. in path /home/dev/app/my-app the APP_NAME will be set to my-app
 APP_NAME := $(notdir $(CURDIR))
@@ -25,6 +24,7 @@ run: build ## Build and run the service binary
 	LOG_FORMAT=text \
 	SERVICE_NAME=${SERVICE_NAME} \
 	CELATONE_QUERY="https://celatone-api-prod.alleslabs.dev/v1/neutron/neutron-1/accounts/neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7/txs?limit=1&offset=0&is_wasm=true&is_move=false&is_initia=false&is_send=false&is_ibc=false&is_instantiate=false&is_store_code=false&is_execute=false&is_migrate=false&is_update_admin=false&is_clear_admin=false&is_move_publish=false&is_move_upgrade=false&is_move_execute=false&is_move_script=false&is_opinit=false" \
+	DROP_ATOM_QUERY="https://neutron-rest.cosmos-apis.com/cosmwasm/wasm/v1/contract/neutron16m3hjh7l04kap086jgwthduma0r5l0wh8kc6kaqk92ge9n5aqvys9q6lxr/smart/eyJ0b3RhbF9ib25kZWQiOnt9fQ%3D%3D" \
 	DATABASE_DSN="host=localhost user=admin password=admin1 dbname=roidrunner port=5432 sslmode=disable TimeZone=UTC" \
 	RPC_ENDPOINT="https://rpc-lb.neutron.org:443/" \
 	DROPLETS_CONTRACT_ADDRESS="neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7" \
@@ -38,20 +38,6 @@ run_race: ## Run the service with race condition checking enabled
 	LOG_FORMAT=text \
 	SERVICE_NAME=${SERVICE_NAME} \
 	go run -race ./src/*.go
-
-docker_build: build ## Build the service Docker container
-	docker build -t ${IMAGE_NAME} .
-
-docker_run: ## Run the Docker container in interactive mode
-	docker run -it --rm --network="host" \
-		# Add your environment variable here
-		-e LOG_LEVEL=debug \
-		-e LOG_FORMAT=text \
-		-e SERVICE_NAME=${SERVICE_NAME} \
-		${IMAGE_NAME}
-
-docker_push: ## Push the Docker container to the registry
-	docker push ${IMAGE_NAME}
 
 fmt: ## Format the code using `go fmt`
 	go fmt ./...

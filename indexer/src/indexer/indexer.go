@@ -26,8 +26,9 @@ type Config struct {
 	DatabaseDSN             string   `envconfig:"DATABASE_DSN" required:"true"`
 	RPCEndpoint             string   `envconfig:"RPC_ENDPOINT" required:"true"`
 	CelatoneQuery           string   `envconfig:"CELATONE_QUERY" required:"true"`
+	DropAtomQuery           string   `envconfig:"DROP_ATOM_QUERY" required:"true"`
 	DropletsContractAddress string   `envconfig:"DROPLETS_CONTRACT_ADDRESS" required:"true"`
-	Skiplist                []string `envconfig:"SKIPLIST" required:"false"`
+	Skiplist                []string `envconfig:"SKIPLIST" required:"true"`
 
 	TempHistoryHeight uint64 `envconfig:"TEMP_HISTORY_HEIGHT" required:"false"`
 	TempHistoryDate   string `envconfig:"TEMP_HISTORY_DATE" required:"false"`
@@ -37,6 +38,7 @@ type Config struct {
 type Indexer struct {
 	rpcEndpoint             string
 	celatoneQuery           string
+	dropAtomQuery           string
 	dropletsContractAddress string
 	logger                  *logrus.Entry
 	stopChannel             chan bool
@@ -77,6 +79,7 @@ func New(
 	return &Indexer{
 		rpcEndpoint:             config.RPCEndpoint,
 		celatoneQuery:           config.CelatoneQuery,
+		dropAtomQuery:           config.DropAtomQuery,
 		dropletsContractAddress: config.DropletsContractAddress,
 		logger:                  log,
 		stopChannel:             make(chan bool),
@@ -142,6 +145,31 @@ func (i *Indexer) Run() error {
 	// Check if the latest on-chain is newer than what we've captured
 	// If so, update Droplets
 	if lastCapture.Height < height {
+		i.logger.Info("Updating Drop Staked ATOM")
+
+		dropStakedAtom, err := i.getDropStakedAtom(height)
+		if err != nil {
+			i.logger.Error("Failed to get Drop staked ATOM")
+			return err
+		}
+		// Save the Drop staked ATOM totals
+		dropStakedAtomModel := models.DropAtomHistory{
+			TotalAtom:   dropStakedAtom,
+			Height:      height,
+			DateBlock:   lastOnchainUpdateTime,
+			DateCreated: time.Now(),
+		}
+		result := i.db.Save(&dropStakedAtomModel)
+		if result.Error != nil {
+			// If the error is a duplicate key error, we ignore it
+			if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
+				i.logger.WithFields(logrus.Fields{
+					"total": dropStakedAtom,
+					"err":   result.Error,
+				}).Fatal("Unable to store Drop staked ATOM")
+			}
+		}
+
 		i.logger.Info("Updating Droplets")
 
 		// Set the offset key to empty
@@ -174,7 +202,7 @@ func (i *Indexer) Run() error {
 		}
 
 		// Truncate the leaderboard
-		result := i.db.Exec("TRUNCATE TABLE droplet_leaderboard")
+		result = i.db.Exec("TRUNCATE TABLE droplet_leaderboard")
 		if result.Error != nil {
 			i.logger.WithFields(logrus.Fields{
 				"err": result.Error,
@@ -419,10 +447,6 @@ func (i *Indexer) getDroplets(height int64, offsetKey bytes.HexBytes, limit uint
 		return lastScannedKey, addressDroplets, err
 	}
 
-	// We need to combine all debts and collateral per account here
-	// So we add them to a map
-	// accounts := make(map[string]types.HealthCheckWorkItem)
-
 	// Structure of raw state we are querying
 	// If a contract has a cw-storage-plus Map "balances" then the raw
 	// state keys for that Map will have "balances" as a prefix. Here we need
@@ -492,4 +516,61 @@ func (i *Indexer) getDroplets(height int64, offsetKey bytes.HexBytes, limit uint
 	}).Debug("Fetched contract items")
 
 	return lastScannedKey, addressDroplets, nil
+}
+
+// getDropStakedAtom fetches the current total Drop staked ATOM from the
+// core Drop contract
+func (i *Indexer) getDropStakedAtom(height int64) (uint64, error) {
+	// URL for the smart contract query
+	url := i.dropAtomQuery
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+
+	// Set the required headers
+	req.Header.Set("x-cosmos-block-height", fmt.Sprintf("%d", height))
+	req.Header.Set("User-Agent", "DropletDashboard-Indexer")
+
+	// Execute the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if the response status is OK
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("received non-OK HTTP status: %s", resp.Status)
+	}
+
+	// Parse the response body
+	var result map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse response body: %v", err)
+	}
+
+	// Extract the "data" field from the response
+	dataStr, ok := result["data"]
+	if !ok {
+		return 0, fmt.Errorf("missing 'data' field in response")
+	}
+
+	// Convert the data string to uint64
+	data, err := strconv.ParseUint(dataStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert data to uint64: %v", err)
+	}
+
+	// Log the fetched data
+	i.logger.WithFields(logrus.Fields{
+		"total":  data,
+		"height": height,
+	}).Debug("Fetched Drop staked ATOM")
+
+	return data, nil
 }
