@@ -4,4 +4,4 @@ A simple dashboard for Droplet enjoyoors on Neutron. This service collects all t
 
 Large parts of the UI was generated using AI as an experiment, perhaps someone will find the stats useful. Any suggestions or improvements are welcome!
 
-![Screenshot of the main dashboard](./assets/screenshot.png)
+![Screenshot of the main dashboard](./assets/screenshot-wdatom.png)
