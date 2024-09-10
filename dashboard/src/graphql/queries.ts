@@ -44,6 +44,16 @@ export const GET_STATS = gql`
   }
 `;
 
+export const GET_DATOM_STATS = gql`
+  query dAtomHistory {
+    drop_atom_history(limit: 1, order_by: { height: desc }) {
+      total_atom
+      date_block
+      height
+    }
+  }
+`;
+
 export const GET_ADDRESS_DETAILS = gql`
   query GetAddressDetails($address: String!) {
     droplet_leaderboard(where: { address: { _eq: $address } }) {
@@ -71,6 +81,16 @@ export const GET_ADDRESSES_IN_RANGE = gql`
       address
       position
       droplets
+    }
+  }
+`;
+
+// Define the new query using gql
+export const GET_ATOM_HISTORY = gql`
+  query GetAtomHistory {
+    drop_atom_history(order_by: { height: asc }) {
+      date_block
+      total_atom
     }
   }
 `;

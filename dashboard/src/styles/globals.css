@@ -4,12 +4,12 @@
 
 :root {
   --foreground: #ffffff;
-  --background: url('/background.png') no-repeat center center fixed;
+  --background: url('/background.jpg') no-repeat center center fixed;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: url('/background.png') no-repeat center center fixed;
+    --background: url('/background.jpg') no-repeat center center fixed;
   }
 }
 
