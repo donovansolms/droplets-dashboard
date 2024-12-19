@@ -4,16 +4,18 @@ import DropletsChart from '@/components/droplets-chart';
 import AddressesChart from '@/components/addresses-chart';
 import { formatNumberCompact } from '@/lib/format-number-compact';
 import { formatDateWithTime } from '@/lib/format-date';
-import { GET_DATOM_STATS, GET_STATS } from '@/graphql/queries';
+import { GET_DATOM_STATS, GET_DTIA_STATS, GET_STATS } from '@/graphql/queries';
 import DashboardHeader from '@/components/dashboard-header';
 import AtomStatsChart from '@/components/atom-stats-chart';
+import TiaStatsChart from '@/components/tia-stats-chart';
 
 const Dashboard = () => {
   const { loading: loadingStats, error: errorStats, data: data } = useQuery(GET_STATS);
   const { loading: loadingDatom, error: errorDatom, data: dataDatom } = useQuery(GET_DATOM_STATS);
+  const { loading: loadingDtia, error: errorDtia, data: dataDtia } = useQuery(GET_DTIA_STATS);
 
   // Handle loading states
-  if (loadingStats || loadingDatom) {
+  if (loadingStats || loadingDatom || loadingDtia) {
     return <div className="text-center mt-5">Loading...</div>;
   }
 
@@ -24,8 +26,10 @@ const Dashboard = () => {
   if (errorDatom) {
     return <p>Error loading datom stats data: {errorDatom.message}</p>;
   }
+  if (errorDtia) {
+    return <p>Error loading dtia stats data: {errorDtia.message}</p>;
+  }
 
-  console.log(dataDatom);
 
   return (
     <div className="max-w-8xl mx-auto p-4 mt-8 mb-8">
@@ -39,7 +43,7 @@ const Dashboard = () => {
               date_block: string;
               height: number;
             }) => (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4">
                 <div className="p-2 w-full text-center">
                   <h2 className="text-xl font-semibold mb-4">Total dATOM</h2>
                   <div className="mx-auto flex max-w-xs flex-col gap-y-4 mb-3">
@@ -48,6 +52,16 @@ const Dashboard = () => {
                     </dd>
                   </div>
                   <AtomStatsChart />
+                </div>
+
+                <div className="p-2 w-full text-center">
+                  <h2 className="text-xl font-semibold mb-4">Total dTIA</h2>
+                  <div className="mx-auto flex max-w-xs flex-col gap-y-4 mb-3">
+                    <dd className="order-first text-3xl font-semibold tracking-tight text-white sm:text-5xl mb-8">
+                      {formatNumberCompact(dataDtia.drop_tia_history[0].total_tia / 10 ** 6)}
+                    </dd>
+                  </div>
+                  <TiaStatsChart />
                 </div>
 
 

@@ -25,6 +25,7 @@ run: build ## Build and run the service binary
 	SERVICE_NAME=${SERVICE_NAME} \
 	CELATONE_QUERY="https://celatone-api-prod.alleslabs.dev/v1/neutron/neutron-1/accounts/neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7/txs?limit=1&offset=0&is_wasm=true&is_move=false&is_initia=false&is_send=false&is_ibc=false&is_instantiate=false&is_store_code=false&is_execute=false&is_migrate=false&is_update_admin=false&is_clear_admin=false&is_move_publish=false&is_move_upgrade=false&is_move_execute=false&is_move_script=false&is_opinit=false" \
 	DROP_ATOM_QUERY="https://neutron-rest.cosmos-apis.com/cosmwasm/wasm/v1/contract/neutron16m3hjh7l04kap086jgwthduma0r5l0wh8kc6kaqk92ge9n5aqvys9q6lxr/smart/eyJ0b3RhbF9ib25kZWQiOnt9fQ%3D%3D" \
+	DROP_TIA_QUERY="https://neutron-rest.cosmos-apis.com/cosmwasm/wasm/v1/contract/neutron1fp649j8djj676kfvh0qj8nt90ne86a8f033w9q7p9vkcqk9mmeeqxc9955/smart/eyJ0b3RhbF9ib25kZWQiOnt9fQ%3D%3D" \
 	DATABASE_DSN="host=localhost user=admin password=admin1 dbname=roidrunner port=5432 sslmode=disable TimeZone=UTC" \
 	RPC_ENDPOINT="https://rpc-lb.neutron.org:443/" \
 	DROPLETS_CONTRACT_ADDRESS="neutron19tth7r78awh6m8f9zs93d4u5su0azhc0755zmzyrzpzxqjnfuyzs7k8tt7" \

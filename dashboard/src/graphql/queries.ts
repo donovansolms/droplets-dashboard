@@ -54,6 +54,16 @@ export const GET_DATOM_STATS = gql`
   }
 `;
 
+export const GET_DTIA_STATS = gql`
+  query dTiaHistory {
+    drop_tia_history(limit: 1, order_by: { height: desc }) {
+      total_tia
+      date_block
+      height
+    }
+  }
+`;
+
 export const GET_ADDRESS_DETAILS = gql`
   query GetAddressDetails($address: String!) {
     droplet_leaderboard(where: { address: { _eq: $address } }) {
@@ -91,6 +101,15 @@ export const GET_ATOM_HISTORY = gql`
     drop_atom_history(order_by: { height: asc }) {
       date_block
       total_atom
+    }
+  }
+`;
+
+export const GET_TIA_HISTORY = gql`
+  query GetTiaHistory {
+    drop_tia_history(order_by: { height: asc }) {
+      date_block
+      total_tia
     }
   }
 `;

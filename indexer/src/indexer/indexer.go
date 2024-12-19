@@ -27,6 +27,7 @@ type Config struct {
 	RPCEndpoint             string   `envconfig:"RPC_ENDPOINT" required:"true"`
 	CelatoneQuery           string   `envconfig:"CELATONE_QUERY" required:"true"`
 	DropAtomQuery           string   `envconfig:"DROP_ATOM_QUERY" required:"true"`
+	DropTiaQuery            string   `envconfig:"DROP_TIA_QUERY" required:"true"`
 	DropletsContractAddress string   `envconfig:"DROPLETS_CONTRACT_ADDRESS" required:"true"`
 	Skiplist                []string `envconfig:"SKIPLIST" required:"true"`
 
@@ -39,6 +40,7 @@ type Indexer struct {
 	rpcEndpoint             string
 	celatoneQuery           string
 	dropAtomQuery           string
+	dropTiaQuery            string
 	dropletsContractAddress string
 	logger                  *logrus.Entry
 	stopChannel             chan bool
@@ -80,6 +82,7 @@ func New(
 		rpcEndpoint:             config.RPCEndpoint,
 		celatoneQuery:           config.CelatoneQuery,
 		dropAtomQuery:           config.DropAtomQuery,
+		dropTiaQuery:            config.DropTiaQuery,
 		dropletsContractAddress: config.DropletsContractAddress,
 		logger:                  log,
 		stopChannel:             make(chan bool),
@@ -167,6 +170,31 @@ func (i *Indexer) Run() error {
 					"total": dropStakedAtom,
 					"err":   result.Error,
 				}).Fatal("Unable to store Drop staked ATOM")
+			}
+		}
+
+		i.logger.Info("Updating Drop Staked TIA")
+
+		dropStakedTia, err := i.getDropStakedTia(height)
+		if err != nil {
+			i.logger.Error("Failed to get Drop staked TIA")
+			return err
+		}
+		// Save the Drop staked TIA totals
+		dropStakedTiaModel := models.DropTiaHistory{
+			TotalTia:    dropStakedTia,
+			Height:      height,
+			DateBlock:   lastOnchainUpdateTime,
+			DateCreated: time.Now(),
+		}
+		result = i.db.Save(&dropStakedTiaModel)
+		if result.Error != nil {
+			// If the error is a duplicate key error, we ignore it
+			if result.Error != gorm.ErrDuplicatedKey && !strings.Contains(result.Error.Error(), "duplicate key value") {
+				i.logger.WithFields(logrus.Fields{
+					"total": dropStakedAtom,
+					"err":   result.Error,
+				}).Fatal("Unable to store Drop staked TIA")
 			}
 		}
 
@@ -571,6 +599,63 @@ func (i *Indexer) getDropStakedAtom(height int64) (uint64, error) {
 		"total":  data,
 		"height": height,
 	}).Debug("Fetched Drop staked ATOM")
+
+	return data, nil
+}
+
+// getDropStakedTia fetches the current total Drop staked TIA from the
+// core Drop contract
+func (i *Indexer) getDropStakedTia(height int64) (uint64, error) {
+	// URL for the smart contract query
+	url := i.dropTiaQuery
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create HTTP request: %v", err)
+	}
+
+	// Set the required headers
+	req.Header.Set("x-cosmos-block-height", fmt.Sprintf("%d", height))
+	req.Header.Set("User-Agent", "DropletDashboard-Indexer")
+
+	// Execute the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to execute HTTP request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Check if the response status is OK
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("received non-OK HTTP status: %s", resp.Status)
+	}
+
+	// Parse the response body
+	var result map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse response body: %v", err)
+	}
+
+	// Extract the "data" field from the response
+	dataStr, ok := result["data"]
+	if !ok {
+		return 0, fmt.Errorf("missing 'data' field in response")
+	}
+
+	// Convert the data string to uint64
+	data, err := strconv.ParseUint(dataStr, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to convert data to uint64: %v", err)
+	}
+
+	// Log the fetched data
+	i.logger.WithFields(logrus.Fields{
+		"total":  data,
+		"height": height,
+	}).Debug("Fetched Drop staked TIA")
 
 	return data, nil
 }

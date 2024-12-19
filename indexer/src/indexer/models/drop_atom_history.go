@@ -15,3 +15,15 @@ type DropAtomHistory struct {
 func (DropAtomHistory) TableName() string {
 	return "drop_atom_history"
 }
+
+type DropTiaHistory struct {
+	ID          uint64    `gorm:"primary_key"`
+	TotalTia    uint64    `gorm:"column:total_tia"`
+	Height      int64     `gorm:"column:height"`
+	DateBlock   time.Time `gorm:"column:date_block"`
+	DateCreated time.Time `gorm:"column:date_created"`
+}
+
+func (DropTiaHistory) TableName() string {
+	return "drop_tia_history"
+}
